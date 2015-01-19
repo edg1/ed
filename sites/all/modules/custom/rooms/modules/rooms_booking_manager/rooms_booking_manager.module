@@ -159,6 +159,12 @@ function rooms_booking_manager_enquiry_page_form($form, $form_state, $start_date
   $form['#tree'] = TRUE;
   $form['#attributes']['class'][] = 'rooms-enquiry-form';
 
+  //ROOMS-529: Added unit name to enquiry email
+  $form['unit'] = array(
+      '#type' => 'hidden',
+      '#value' => $unit_obj->name,
+  );
+
   $form['start_date'] = array(
     '#type' => 'hidden',
     '#value' => $start_date->format('Y-m-d'),
@@ -404,7 +410,7 @@ function rooms_booking_manager_results_page(DateTime $start_date, DateTime $end_
 
       if ($_GET['type'] == 'all') {
         $types = variable_get('rooms_unit_type_selector', array());
-        
+
         foreach ($types as $element) {
           $unit_types[] = $element;
         }
@@ -575,6 +581,14 @@ function rooms_booking_manager_change_search_form($form, &$form_state, $start_da
     );
   }
 
+  // Include form elements provided by other availability search plugins.
+  ctools_include('plugins');
+  $filters = ctools_get_plugins('rooms_booking', 'availabilityagent_filter');
+  foreach ($filters as $filter) {
+    $class = ctools_plugin_get_class($filter, 'handler');
+    $class::availabilityChangeSearchForm($form, $form_state);
+  }
+
   // We add the form's #submit array to this button along with the actual submit
   // handler to preserve any submit handlers added by a form callback_wrapper.
   $submit = array('rooms_booking_manager_change_search_form_submit');
@@ -597,6 +611,16 @@ function rooms_booking_manager_change_search_form($form, &$form_state, $start_da
   );
 
   return $form;
+}
+
+function rooms_booking_manager_change_search_form_validate($form, &$form_state) {
+  // validate form elements provided by other availability search plugins.
+  ctools_include('plugins');
+  $filters = ctools_get_plugins('rooms_booking', 'availabilityagent_filter');
+  foreach ($filters as $filter) {
+    $class = ctools_plugin_get_class($filter, 'handler');
+    $class::availabilityChangeSearchFormValidate($form, $form_state);
+  }
 }
 
 /**
@@ -848,7 +872,7 @@ function book_unit_form_builder($form_id, $form_state, $unit, $start_date, $end_
     $option_name = strtolower(str_replace(array(':', ' '), '_', $option['name']));
     $form['options'][$option_name] = array(
       '#type' => 'checkbox',
-      '#title' => $option['name'],
+      '#title' => t($option['name']),
       '#ajax' => array(
         'callback' => 'rooms_booking_manager_options_change_callback',
         'wrapper' => 'unit_' . $unit->unit_id . '_price',
@@ -1405,7 +1429,7 @@ function book_units_per_type_form($form, $form_state, $units_per_type, $start_da
             $option_name = strtolower(str_replace(array(':', ' '), '_', $option['name']));
             $form[$type][$price]['fieldset'][$c][$option_name] = array(
               '#type' => 'checkbox',
-              '#title' => $option['name'],
+              '#title' => t($option['name']),
               '#ajax' => array(
                 'callback' => 'rooms_booking_manager_options_change_callback',
                 'wrapper' => $type . '_' . $price . '_' . $c . '_price',
@@ -1873,6 +1897,8 @@ function rooms_booking_manager_change_search_form_submit($form, &$form_state) {
     }
   }
 
+  $query = rooms_booking_manager_get_plugin_parameters($form_state);
+
   // Build query parameters from the provided form fields.
   $query['rooms_start_date'] = $form_state['values']['start_date'];
   $query['rooms_end_date'] = $form_state['values']['end_date'];
@@ -1891,6 +1917,32 @@ function rooms_booking_manager_change_search_form_submit($form, &$form_state) {
       'query' => $query,
     ),
   );
+}
+
+/**
+ * Retrieves parameters defined by plugins and return them as an array.
+ *
+ * @param $form_state
+ * @return array
+ */
+function rooms_booking_manager_get_plugin_parameters($form_state) {
+  $plugins_values = array();
+  $query = array();
+
+  ctools_include('plugins');
+  $filters = ctools_get_plugins('rooms_booking', 'availabilityagent_filter');
+  foreach ($filters as $filter) {
+    $class = ctools_plugin_get_class($filter, 'handler');
+    $plugins_values += $class::availabilitySearchParameters();
+  }
+
+  // Collect the values for booking parameters.
+  foreach ($plugins_values as $value) {
+    if (isset($form_state['values'][$value])) {
+      $query[$value] = is_array($form_state['values'][$value]) ? implode(',', $form_state['values'][$value]) : $form_state['values'][$value];
+    }
+  }
+  return $query;
 }
 
 /**
@@ -2390,7 +2442,7 @@ function rooms_booking_manager_alter_rooms_booking_settings(&$form, &$form_state
  */
 function rooms_booking_manager_alter_rooms_booking_settings_validate($form, &$form_state) {
   // Delete unchecked items.
-  $form_state['values']['rooms_unit_type_selector'] = array_diff($form_state['values']['rooms_unit_type_selector'], array(0)); 
+  $form_state['values']['rooms_unit_type_selector'] = array_diff($form_state['values']['rooms_unit_type_selector'], array(0));
 }
 
 /**

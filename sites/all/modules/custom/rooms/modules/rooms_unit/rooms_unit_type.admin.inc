@@ -160,16 +160,19 @@ function rooms_unit_type_form($form, &$form_state, $unit_type, $op = 'edit') {
     '#weight' => 99,
   );
 
-  $form['unit_type_selector'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Unit type selector'),
-    '#description' => t('Unchecking this option the unit type will not appear in the unit-type selector form.'),
-    '#options' => array(
-      '1' => 'Add to unit type selector',
-    ),
-    '#default_value' => array('1'),
-    '#weight' => 100,
-  );
+  if (variable_get('rooms_booking_manager_type_selector', ROOMS_DISPLAY_TYPE_SELECTOR_NO)) {
+    $unit_types = variable_get('rooms_unit_type_selector', array());
+    $form['unit_type_selector'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Unit type selector'),
+      '#description' => t('Unchecking this option the unit type will not appear in the unit-type selector form.'),
+      '#options' => array(
+        1 => 'Add to unit type selector',
+      ),
+      '#default_value' => !empty($unit_types[$unit_type->type]),
+      '#weight' => 100,
+    );
+  }
 
   $form['actions'] = array(
     '#type' => 'actions',
@@ -237,7 +240,7 @@ function rooms_unit_type_form_submit($form, &$form_state) {
   $unit_types = variable_get_value('rooms_unit_type_selector');
 
   // If checked add unit type to list of unit types to show.
-  if ($form_state['values']['unit_type_selector'][1]) {
+  if (!empty($form_state['values']['unit_type_selector'])) {
     $unit_types[$form_state['values']['type']] = $form_state['values']['label'];
     variable_set('rooms_unit_type_selector', $unit_types);
   }
