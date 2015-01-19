@@ -215,9 +215,9 @@ $databases = array (
   array (
     'default' => 
     array (
-      'database' => 'edweb',
-      'username' => 'root',
-      'password' => '123',
+      'database' => 'edbe',
+      'username' => 'edbe',
+      'password' => 'wu%9whes',
       'host' => 'localhost',
       'port' => '',
       'driver' => 'mysql',
@@ -278,7 +278,7 @@ $drupal_hash_salt = '2IoeSvb-l_1dW5jo83ISAtKsYy8SxHBgO-EQEwLL6f8';
  * It is not allowed to have a trailing slash; Drupal will add it
  * for you.
  */
-# $base_url = 'http://www.example.com';  // NO trailing slash!
+$base_url = 'http://www.ed.be';  // NO trailing slash!
 
 /**
  * PHP settings:
