@@ -11,10 +11,3 @@ files[] = includes/rooms_pricing.pricing_event_interface.inc
 
 dependencies[] = rooms_unit
 dependencies[] = commerce
-
-; Information added by Drupal.org packaging script on 2014-06-19
-version = "7.x-1.3"
-core = "7.x"
-project = "rooms"
-datestamp = "1403200429"
-

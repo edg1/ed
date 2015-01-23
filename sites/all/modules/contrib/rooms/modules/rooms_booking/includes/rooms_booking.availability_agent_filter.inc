@@ -19,12 +19,60 @@ interface AvailabilityAgentFilterInterface {
    */
   public function applyFilter();
 
+  /**
+   * Returns a list of parameters to add to the search array.
+   *
+   * @return array
+   *   List of parameters provided by this filter.
+   */
+  public static function availabilitySearchParameters();
+
+  /**
+   * Adds necessary form elements to Availability search form.
+   *
+   * @param array $form
+   *   The Availability search form array.
+   * @param array $form_state
+   *   The Availability search form state array.
+   */
+  public static function availabilitySearchForm(&$form, &$form_state);
+
+  /**
+   * Specific validation callback for Availability search form.
+   *
+   * @param array $form
+   *   The Availability search form array.
+   * @param array $form_state
+   *   The Availability search form state array.
+   */
+  public static function availabilitySearchFormValidate(&$form, &$form_state);
+
+  /**
+   * Adds necessary form elements to Change availability search form.
+   *
+   * @param array $form
+   *   The Change availability search form array.
+   * @param array $form_state
+   *   The Change availability search form state array.
+   */
+  public static function availabilityChangeSearchForm(&$form, &$form_state);
+
+  /**
+   * Specific validation callback for Change availability search form.
+   *
+   * @param array $form
+   *   The Change availability search form array.
+   * @param array $form_state
+   *   The Change availability search form state array.
+   */
+  public static function availabilityChangeSearchFormValidate(&$form, &$form_state);
+
 }
 
 /**
  * Abstract class implementing AvailabilityAgentFilterInterface.
  */
-abstract class AvailabilityAgentCommonFilter implements AvailabilityAgentFilterInterface {
+abstract class AvailabilityAgentFilterBase implements AvailabilityAgentFilterInterface {
 
   /**
    * Set of bookable units to filter through.
@@ -77,12 +125,37 @@ abstract class AvailabilityAgentCommonFilter implements AvailabilityAgentFilterI
     return $results;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public static function availabilitySearchParameters() { }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function availabilitySearchForm(&$form, &$form_state) { }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function availabilitySearchFormValidate(&$form, &$form_state) { }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function availabilityChangeSearchForm(&$form, &$form_state) { }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function availabilityChangeSearchFormValidate(&$form, &$form_state) { }
+
 }
 
 /**
  * Filter by group_size and group_size_children.
  */
-class AvailabilityAgentSizeFilter extends AvailabilityAgentCommonFilter {
+class AvailabilityAgentSizeFilter extends AvailabilityAgentFilterBase {
 
   /**
    * {@inheritdoc}
@@ -103,7 +176,7 @@ class AvailabilityAgentSizeFilter extends AvailabilityAgentCommonFilter {
 
     // Add a unit type condition if this has been defined.
     if ($unit_types != NULL) {
-      $query->propertyCondition('type', $unit_types[0]);
+      $query->propertyCondition('type', $unit_types);
     }
 
     // Execute the query and collect the results.
@@ -127,7 +200,7 @@ class AvailabilityAgentSizeFilter extends AvailabilityAgentCommonFilter {
 /**
  * Filter by start_date, end_date, valid_states.
  */
-class AvailabilityAgentDateFilter extends AvailabilityAgentCommonFilter {
+class AvailabilityAgentDateFilter extends AvailabilityAgentFilterBase {
 
   /**
    * {@inheritdoc}
@@ -191,7 +264,7 @@ class AvailabilityAgentDateFilter extends AvailabilityAgentCommonFilter {
 /**
  * Filter units if is in the commerce cart.
  */
-class AvailabilityAgentCommerceFilter extends AvailabilityAgentCommonFilter {
+class AvailabilityAgentCommerceFilter extends AvailabilityAgentFilterBase {
 
   /**
    * {@inheritdoc}
@@ -220,8 +293,17 @@ class AvailabilityAgentCommerceFilter extends AvailabilityAgentCommonFilter {
       $results = $this->units;
     }
 
-    // Load order for current user.
-    if ($order = commerce_cart_order_load($user->uid)) {
+    // Load all the current carts to
+    $orders = array();
+    $query = new EntityFieldQuery();
+    $result = $query->entityCondition('entity_type', 'commerce_order')
+      ->propertyCondition('status', array('cart', 'checkout_checkout', 'checkout_review', 'checkout_payment', 'checkout_complete'))
+      ->execute();
+    if (isset($result['commerce_order'])) {
+      $orders = commerce_order_load_multiple(array_keys($result['commerce_order']));
+    }
+
+    foreach ($orders as $order) {
       $wrapper = entity_metadata_wrapper('commerce_order', $order);
 
       // See if there are any product line items.

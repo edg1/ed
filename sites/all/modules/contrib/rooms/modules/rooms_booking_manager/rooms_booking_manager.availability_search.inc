@@ -88,7 +88,7 @@ function rooms_booking_availability_search_form_builder($form, &$form_state) {
 
       $form['rooms_fieldset']['group_size_adults:' . $i] = array(
         '#type' => 'select',
-        '#options' => rooms_assoc_range(1, 8),
+        '#options' => rooms_assoc_range(1, variable_get('rooms_booking_manager_search_form_max_group_size', 8)),
         '#default_value' => isset($booking_parameters[$i]['adults']) ? $booking_parameters[$i]['adults'] : '2',
         '#prefix' => '<td class="rooms-group-size__people">',
         '#suffix' => '</td>',
@@ -116,7 +116,7 @@ function rooms_booking_availability_search_form_builder($form, &$form_state) {
     $form['rooms_fieldset']['group_size_adults:1'] = array(
       '#type' => 'select',
       '#title' => variable_get_value('rooms_booking_manager_group_size'),
-      '#options' => rooms_assoc_range(1, 8),
+      '#options' => rooms_assoc_range(1, variable_get('rooms_booking_manager_search_form_max_group_size', 8)),
       '#default_value' => isset($booking_parameters[1]['adults']) ? $booking_parameters[1]['adults'] : 2,
     );
 
@@ -131,19 +131,33 @@ function rooms_booking_availability_search_form_builder($form, &$form_state) {
   }
 
   if (variable_get('rooms_booking_manager_type_selector', ROOMS_DISPLAY_TYPE_SELECTOR_NO) == ROOMS_DISPLAY_TYPE_SELECTOR) {
-    $form['unit_type'] = array(
-      '#title' => variable_get_value('rooms_booking_manager_select_type'),
-      '#type' => 'select',
-      '#options' => array('' => '') + rooms_unit_types_ids(),
-      '#default_value' => 0,
-    );
+    $searchable_unit_types = variable_get('rooms_unit_type_selector', array());
+    if (!empty($searchable_unit_types)) {
+      $unit_types = variable_get('rooms_unit_type_selector', array());
 
-    if (isset($_GET['type'])) {
-      $type = check_plain($_GET['type']);
-      if ($type != '' && rooms_unit_type_load($type) !== FALSE) {
-        $form['unit_type']['#default_value'] = $type;
+      $form['unit_type'] = array(
+        '#title' => variable_get_value('rooms_booking_manager_select_type'),
+        '#type' => 'select',
+        '#empty_option' => t('Select All'),
+        '#options' => $unit_types,
+        '#default_value' => 0,
+      );
+
+      if (isset($_GET['type'])) {
+        $type = check_plain($_GET['type']);
+        if ($type != '' && rooms_unit_type_load($type) !== FALSE) {
+          $form['unit_type']['#default_value'] = $type;
+        }
       }
     }
+  }
+
+  // Include form elements provided by other availability search plugins.
+  ctools_include('plugins');
+  $filters = ctools_get_plugins('rooms_booking', 'availabilityagent_filter');
+  foreach ($filters as $filter) {
+    $class = ctools_plugin_get_class($filter, 'handler');
+    $class::availabilitySearchForm($form, $form_state);
   }
 
   $form['actions'] = array(
@@ -197,6 +211,14 @@ function rooms_booking_availability_search_form_validate(&$form, &$form_state) {
   if ($diff1->days < $rooms_booking_start_date) {
     form_set_error('rooms_date_range', t('Bookings must be made at least @count_days in advance.', array('@count_days' => format_plural($rooms_booking_start_date, '1 day', '@count days'))));
   }
+
+  // Validate form elements provided by other availability search plugins.
+  ctools_include('plugins');
+  $filters = ctools_get_plugins('rooms_booking', 'availabilityagent_filter');
+  foreach ($filters as $filter) {
+    $class = ctools_plugin_get_class($filter, 'handler');
+    $class::availabilitySearchFormValidate($form, $form_state);
+  }
 }
 
 /**
@@ -212,10 +234,15 @@ function rooms_booking_availability_search_form_submit(&$form, &$form_state) {
   $rooms_query = array();
 
   if (isset($form_state['values']['unit_type'])) {
-    if ($form_state['values']['unit_type'] != '') {
+    if (!empty($form_state['values']['unit_type'])) {
       $rooms_query['type'] = $form_state['values']['unit_type'];
     }
+    else {
+      $rooms_query['type'] = 'all';
+    }
   }
+
+  $rooms_query += rooms_booking_manager_get_plugin_parameters($form_state);
 
   // Collect the values for booking parameters.
   foreach ($form_state['values'] as $key => $value) {
